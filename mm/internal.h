@@ -151,6 +151,9 @@ extern void __free_pages_bootmem(struct page *page, unsigned long pfn,
 extern void prep_compound_page(struct page *page, unsigned int order);
 extern int user_min_free_kbytes;
 
+extern void set_zone_contiguous(struct zone *zone);
+extern void clear_zone_contiguous(struct zone *zone);
+
 #if defined CONFIG_COMPACTION || defined CONFIG_CMA
 
 /*

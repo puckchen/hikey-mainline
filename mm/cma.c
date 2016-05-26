@@ -38,6 +38,7 @@
 #include <trace/events/cma.h>
 
 #include "cma.h"
+#include "internal.h"
 
 struct cma cma_areas[MAX_CMA_AREAS];
 unsigned cma_area_count;
@@ -145,6 +146,11 @@ err:
 static int __init cma_init_reserved_areas(void)
 {
 	int i;
+	struct zone *zone;
+	unsigned long start_pfn = UINT_MAX, end_pfn = 0;
+
+	if (!cma_area_count)
+		return 0;
 
 	for (i = 0; i < cma_area_count; i++) {
 		int ret = cma_activate_area(&cma_areas[i]);
@@ -152,6 +158,41 @@ static int __init cma_init_reserved_areas(void)
 		if (ret)
 			return ret;
 	}
+
+	for (i = 0; i < cma_area_count; i++) {
+		if (start_pfn > cma_areas[i].base_pfn)
+			start_pfn = cma_areas[i].base_pfn;
+		if (end_pfn < cma_areas[i].base_pfn + cma_areas[i].count)
+			end_pfn = cma_areas[i].base_pfn + cma_areas[i].count;
+	}
+
+	for_each_populated_zone(zone) {
+		if (!is_zone_cma(zone))
+			continue;
+
+		/* ZONE_CMA doesn't need to exceed CMA region */
+		zone->zone_start_pfn = max(zone->zone_start_pfn, start_pfn);
+		zone->spanned_pages = min(zone_end_pfn(zone), end_pfn) -
+					zone->zone_start_pfn;
+	}
+
+	/*
+	 * Reserved pages for ZONE_CMA are now activated and this would change
+	 * ZONE_CMA's managed page counter and other zone's present counter.
+	 * We need to re-calculate various zone information that depends on
+	 * this initialization.
+	 */
+	build_all_zonelists(NULL, NULL);
+	for_each_populated_zone(zone) {
+		zone_pcp_update(zone);
+		set_zone_contiguous(zone);
+	}
+
+	/*
+	 * We need to re-init per zone wmark by calling
+	 * init_per_zone_wmark_min() but doesn't call here because it is
+	 * registered on module_init and it will be called later than us.
+	 */
 
 	return 0;
 }
