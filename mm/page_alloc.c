@@ -4868,6 +4868,8 @@ int local_memory_node(int node)
 }
 #endif
 
+static void setup_min_unmapped_ratio(struct zone *zone);
+static void setup_min_slab_ratio(struct zone *zone);
 #else	/* CONFIG_NUMA */
 
 static void set_zonelist_order(void)
@@ -5982,9 +5984,8 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 		zone->managed_pages = is_highmem_idx(j) ? realsize : freesize;
 #ifdef CONFIG_NUMA
 		zone->node = nid;
-		zone->min_unmapped_pages = (freesize*sysctl_min_unmapped_ratio)
-						/ 100;
-		zone->min_slab_pages = (freesize * sysctl_min_slab_ratio) / 100;
+		setup_min_unmapped_ratio(zone);
+		setup_min_slab_ratio(zone);
 #endif
 		zone->name = zone_names[j];
 		spin_lock_init(&zone->lock);
@@ -6890,6 +6891,7 @@ int __meminit init_per_zone_wmark_min(void)
 {
 	unsigned long lowmem_kbytes;
 	int new_min_free_kbytes;
+	struct zone *zone;
 
 	lowmem_kbytes = nr_free_buffer_pages() * (PAGE_SIZE >> 10);
 	new_min_free_kbytes = int_sqrt(lowmem_kbytes * 16);
@@ -6907,6 +6909,14 @@ int __meminit init_per_zone_wmark_min(void)
 	setup_per_zone_wmarks();
 	refresh_zone_stat_thresholds();
 	setup_per_zone_lowmem_reserve();
+
+	for_each_zone(zone) {
+#ifdef CONFIG_NUMA
+		setup_min_unmapped_ratio(zone);
+		setup_min_slab_ratio(zone);
+#endif
+	}
+
 	return 0;
 }
 core_initcall(init_per_zone_wmark_min)
@@ -6948,6 +6958,12 @@ int watermark_scale_factor_sysctl_handler(struct ctl_table *table, int write,
 }
 
 #ifdef CONFIG_NUMA
+static void setup_min_unmapped_ratio(struct zone *zone)
+{
+	zone->min_unmapped_pages = (zone->managed_pages *
+			sysctl_min_unmapped_ratio) / 100;
+}
+
 int sysctl_min_unmapped_ratio_sysctl_handler(struct ctl_table *table, int write,
 	void __user *buffer, size_t *length, loff_t *ppos)
 {
@@ -6959,9 +6975,15 @@ int sysctl_min_unmapped_ratio_sysctl_handler(struct ctl_table *table, int write,
 		return rc;
 
 	for_each_zone(zone)
-		zone->min_unmapped_pages = (zone->managed_pages *
-				sysctl_min_unmapped_ratio) / 100;
+		setup_min_unmapped_ratio(zone);
+
 	return 0;
+}
+
+static void setup_min_slab_ratio(struct zone *zone)
+{
+	zone->min_slab_pages = (zone->managed_pages *
+			sysctl_min_slab_ratio) / 100;
 }
 
 int sysctl_min_slab_ratio_sysctl_handler(struct ctl_table *table, int write,
@@ -6975,8 +6997,8 @@ int sysctl_min_slab_ratio_sysctl_handler(struct ctl_table *table, int write,
 		return rc;
 
 	for_each_zone(zone)
-		zone->min_slab_pages = (zone->managed_pages *
-				sysctl_min_slab_ratio) / 100;
+		setup_min_slab_ratio(zone);
+
 	return 0;
 }
 #endif
