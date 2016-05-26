@@ -202,6 +202,9 @@ int sysctl_lowmem_reserve_ratio[MAX_NR_ZONES-1] = {
 	 32,
 #endif
 	 32,
+#ifdef CONFIG_CMA
+	 32,
+#endif
 };
 
 EXPORT_SYMBOL(totalram_pages);
@@ -218,6 +221,9 @@ static char * const zone_names[MAX_NR_ZONES] = {
 	 "HighMem",
 #endif
 	 "Movable",
+#ifdef CONFIG_CMA
+	 "CMA",
+#endif
 #ifdef CONFIG_ZONE_DEVICE
 	 "Device",
 #endif
@@ -5131,6 +5137,15 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 	struct memblock_region *r = NULL, *tmp;
 #endif
 
+	/*
+	 * Physical pages for ZONE_CMA are belong to other zones now. They
+	 * are initialized when corresponding zone is initialized and they
+	 * will be moved to ZONE_CMA later. Zone information will also be
+	 * adjusted later.
+	 */
+	if (is_zone_cma_idx(zone))
+		return;
+
 	if (highest_memmap_pfn < end_pfn - 1)
 		highest_memmap_pfn = end_pfn - 1;
 
@@ -5567,7 +5582,7 @@ static void __init find_usable_zone_for_movable(void)
 {
 	int zone_index;
 	for (zone_index = MAX_NR_ZONES - 1; zone_index >= 0; zone_index--) {
-		if (zone_index == ZONE_MOVABLE)
+		if (zone_index == ZONE_MOVABLE || is_zone_cma_idx(zone_index))
 			continue;
 
 		if (arch_zone_highest_possible_pfn[zone_index] >
@@ -5776,12 +5791,21 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 						unsigned long *zholes_size)
 {
 	unsigned long realtotalpages = 0, totalpages = 0;
+	unsigned long zone_cma_start_pfn = UINT_MAX;
+	unsigned long zone_cma_end_pfn = 0;
 	enum zone_type i;
 
 	for (i = 0; i < MAX_NR_ZONES; i++) {
 		struct zone *zone = pgdat->node_zones + i;
 		unsigned long zone_start_pfn, zone_end_pfn;
 		unsigned long size, real_size;
+
+		if (is_zone_cma_idx(i)) {
+			zone->zone_start_pfn = zone_cma_start_pfn;
+			size = zone_cma_end_pfn - zone_cma_start_pfn;
+			real_size = 0;
+			goto init_zone;
+		}
 
 		size = zone_spanned_pages_in_node(pgdat->node_id, i,
 						  node_start_pfn,
@@ -5792,12 +5816,22 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 		real_size = size - zone_absent_pages_in_node(pgdat->node_id, i,
 						  node_start_pfn, node_end_pfn,
 						  zholes_size);
-		if (size)
+		if (size) {
 			zone->zone_start_pfn = zone_start_pfn;
-		else
+			if (zone_cma_start_pfn > zone_start_pfn)
+				zone_cma_start_pfn = zone_start_pfn;
+			if (zone_cma_end_pfn < zone_start_pfn + size)
+				zone_cma_end_pfn = zone_start_pfn + size;
+		} else
 			zone->zone_start_pfn = 0;
+
+init_zone:
 		zone->spanned_pages = size;
 		zone->present_pages = real_size;
+
+		/* Prevent to over-count node span */
+		if (is_zone_cma_idx(i))
+			size = 0;
 
 		totalpages += size;
 		realtotalpages += real_size;
@@ -5940,6 +5974,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 		struct zone *zone = pgdat->node_zones + j;
 		unsigned long size, realsize, freesize, memmap_pages;
 		unsigned long zone_start_pfn = zone->zone_start_pfn;
+		bool zone_kernel = !is_highmem_idx(j) && !is_zone_cma_idx(j);
 
 		size = zone->spanned_pages;
 		realsize = freesize = zone->present_pages;
@@ -5950,7 +5985,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 		 * and per-cpu initialisations
 		 */
 		memmap_pages = calc_memmap_size(size, realsize);
-		if (!is_highmem_idx(j)) {
+		if (zone_kernel) {
 			if (freesize >= memmap_pages) {
 				freesize -= memmap_pages;
 				if (memmap_pages)
@@ -5969,7 +6004,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 					zone_names[0], dma_reserve);
 		}
 
-		if (!is_highmem_idx(j))
+		if (zone_kernel)
 			nr_kernel_pages += freesize;
 		/* Charge for highmem memmap if there are enough kernel pages */
 		else if (nr_kernel_pages > memmap_pages * 2)
@@ -5981,7 +6016,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 		 * when the bootmem allocator frees pages into the buddy system.
 		 * And all highmem pages will be managed by the buddy system.
 		 */
-		zone->managed_pages = is_highmem_idx(j) ? realsize : freesize;
+		zone->managed_pages = zone_kernel ? freesize : realsize;
 #ifdef CONFIG_NUMA
 		zone->node = nid;
 		setup_min_unmapped_ratio(zone);
@@ -5998,7 +6033,12 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 		mod_zone_page_state(zone, NR_ALLOC_BATCH, zone->managed_pages);
 
 		lruvec_init(&zone->lruvec);
-		if (!size)
+
+		/*
+		 * ZONE_CMA should be initialized even if it has no present
+		 * page now since pages will be moved to the zone later.
+		 */
+		if (!size && !is_zone_cma_idx(j))
 			continue;
 
 		set_pageblock_order();
@@ -6452,7 +6492,7 @@ void __init free_area_init_nodes(unsigned long *max_zone_pfn)
 	arch_zone_lowest_possible_pfn[0] = find_min_pfn_with_active_regions();
 	arch_zone_highest_possible_pfn[0] = max_zone_pfn[0];
 	for (i = 1; i < MAX_NR_ZONES; i++) {
-		if (i == ZONE_MOVABLE)
+		if (i == ZONE_MOVABLE || is_zone_cma_idx(i))
 			continue;
 		arch_zone_lowest_possible_pfn[i] =
 			arch_zone_highest_possible_pfn[i-1];
@@ -6469,7 +6509,7 @@ void __init free_area_init_nodes(unsigned long *max_zone_pfn)
 	/* Print out the zone ranges */
 	pr_info("Zone ranges:\n");
 	for (i = 0; i < MAX_NR_ZONES; i++) {
-		if (i == ZONE_MOVABLE)
+		if (i == ZONE_MOVABLE || is_zone_cma_idx(i))
 			continue;
 		pr_info("  %-8s ", zone_names[i]);
 		if (arch_zone_lowest_possible_pfn[i] ==
@@ -7191,6 +7231,11 @@ bool has_unmovable_pages(struct zone *zone, struct page *page, int count,
 	 */
 	if (zone_idx(zone) == ZONE_MOVABLE)
 		return false;
+
+	/* ZONE_CMA never contains unmovable pages */
+	if (is_zone_cma(zone))
+		return false;
+
 	mt = get_pageblock_migratetype(page);
 	if (mt == MIGRATE_MOVABLE || is_migrate_cma(mt))
 		return false;
