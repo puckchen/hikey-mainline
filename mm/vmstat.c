@@ -1074,10 +1074,7 @@ static void pagetypeinfo_showmixedcount_print(struct seq_file *m,
 
 			page_mt = gfpflags_to_migratetype(page_ext->gfp_mask);
 			if (pageblock_mt != page_mt) {
-				if (is_migrate_cma(pageblock_mt))
-					count[MIGRATE_MOVABLE]++;
-				else
-					count[pageblock_mt]++;
+				count[pageblock_mt]++;
 
 				pfn = block_end_pfn;
 				break;
