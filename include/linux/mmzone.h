@@ -41,22 +41,6 @@ enum {
 	MIGRATE_RECLAIMABLE,
 	MIGRATE_PCPTYPES,	/* the number of types on the pcp lists */
 	MIGRATE_HIGHATOMIC = MIGRATE_PCPTYPES,
-#ifdef CONFIG_CMA
-	/*
-	 * MIGRATE_CMA migration type is designed to mimic the way
-	 * ZONE_MOVABLE works.  Only movable pages can be allocated
-	 * from MIGRATE_CMA pageblocks and page allocator never
-	 * implicitly change migration type of MIGRATE_CMA pageblock.
-	 *
-	 * The way to use it is to change migratetype of a range of
-	 * pageblocks to MIGRATE_CMA which can be done by
-	 * __free_pageblock_cma() function.  What is important though
-	 * is that a range of pageblocks must be aligned to
-	 * MAX_ORDER_NR_PAGES should biggest page be bigger then
-	 * a single pageblock.
-	 */
-	MIGRATE_CMA,
-#endif
 #ifdef CONFIG_MEMORY_ISOLATION
 	MIGRATE_ISOLATE,	/* can't allocate from here */
 #endif
@@ -65,12 +49,6 @@ enum {
 
 /* In mm/page_alloc.c; keep in sync also with show_migration_types() there */
 extern char * const migratetype_names[MIGRATE_TYPES];
-
-#ifdef CONFIG_CMA
-#  define is_migrate_cma(migratetype) unlikely((migratetype) == MIGRATE_CMA)
-#else
-#  define is_migrate_cma(migratetype) false
-#endif
 
 #define for_each_migratetype_order(order, type) \
 	for (order = 0; order < MAX_ORDER; order++) \
@@ -152,7 +130,6 @@ enum zone_stat_item {
 	WORKINGSET_ACTIVATE,
 	WORKINGSET_NODERECLAIM,
 	NR_ANON_TRANSPARENT_HUGEPAGES,
-	NR_FREE_CMA_PAGES,
 	NR_VM_ZONE_STAT_ITEMS };
 
 /*
@@ -312,6 +289,9 @@ enum zone_type {
 	ZONE_HIGHMEM,
 #endif
 	ZONE_MOVABLE,
+#ifdef CONFIG_CMA
+	ZONE_CMA,
+#endif
 #ifdef CONFIG_ZONE_DEVICE
 	ZONE_DEVICE,
 #endif
@@ -806,11 +786,37 @@ static inline int zone_movable_is_highmem(void)
 }
 #endif
 
+static inline int is_zone_cma_idx(enum zone_type idx)
+{
+#ifdef CONFIG_CMA
+	return idx == ZONE_CMA;
+#else
+	return 0;
+#endif
+}
+
+static inline int is_zone_cma(struct zone *zone)
+{
+	int zone_idx = zone_idx(zone);
+
+	return is_zone_cma_idx(zone_idx);
+}
+
+static inline int zone_cma_is_highmem(void)
+{
+#ifdef CONFIG_HIGHMEM
+	return 1;
+#else
+	return 0;
+#endif
+}
+
 static inline int is_highmem_idx(enum zone_type idx)
 {
 #ifdef CONFIG_HIGHMEM
 	return (idx == ZONE_HIGHMEM ||
-		(idx == ZONE_MOVABLE && zone_movable_is_highmem()));
+		(idx == ZONE_MOVABLE && zone_movable_is_highmem()) ||
+		(is_zone_cma_idx(idx) && zone_cma_is_highmem()));
 #else
 	return 0;
 #endif

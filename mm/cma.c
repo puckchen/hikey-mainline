@@ -38,6 +38,7 @@
 #include <trace/events/cma.h>
 
 #include "cma.h"
+#include "internal.h"
 
 struct cma cma_areas[MAX_CMA_AREAS];
 unsigned cma_area_count;
@@ -51,6 +52,21 @@ phys_addr_t cma_get_base(const struct cma *cma)
 unsigned long cma_get_size(const struct cma *cma)
 {
 	return cma->count << PAGE_SHIFT;
+}
+
+unsigned long cma_get_free(void)
+{
+	struct zone *zone;
+	unsigned long freecma = 0;
+
+	for_each_populated_zone(zone) {
+		if (!is_zone_cma(zone))
+			continue;
+
+		freecma += zone_page_state(zone, NR_FREE_PAGES);
+	}
+
+	return freecma;
 }
 
 static unsigned long cma_bitmap_aligned_mask(const struct cma *cma,
@@ -145,6 +161,11 @@ err:
 static int __init cma_init_reserved_areas(void)
 {
 	int i;
+	struct zone *zone;
+	unsigned long start_pfn = UINT_MAX, end_pfn = 0;
+
+	if (!cma_area_count)
+		return 0;
 
 	for (i = 0; i < cma_area_count; i++) {
 		int ret = cma_activate_area(&cma_areas[i]);
@@ -152,6 +173,41 @@ static int __init cma_init_reserved_areas(void)
 		if (ret)
 			return ret;
 	}
+
+	for (i = 0; i < cma_area_count; i++) {
+		if (start_pfn > cma_areas[i].base_pfn)
+			start_pfn = cma_areas[i].base_pfn;
+		if (end_pfn < cma_areas[i].base_pfn + cma_areas[i].count)
+			end_pfn = cma_areas[i].base_pfn + cma_areas[i].count;
+	}
+
+	for_each_populated_zone(zone) {
+		if (!is_zone_cma(zone))
+			continue;
+
+		/* ZONE_CMA doesn't need to exceed CMA region */
+		zone->zone_start_pfn = max(zone->zone_start_pfn, start_pfn);
+		zone->spanned_pages = min(zone_end_pfn(zone), end_pfn) -
+					zone->zone_start_pfn;
+	}
+
+	/*
+	 * Reserved pages for ZONE_CMA are now activated and this would change
+	 * ZONE_CMA's managed page counter and other zone's present counter.
+	 * We need to re-calculate various zone information that depends on
+	 * this initialization.
+	 */
+	build_all_zonelists(NULL, NULL);
+	for_each_populated_zone(zone) {
+		zone_pcp_update(zone);
+		set_zone_contiguous(zone);
+	}
+
+	/*
+	 * We need to re-init per zone wmark by calling
+	 * init_per_zone_wmark_min() but doesn't call here because it is
+	 * registered on module_init and it will be called later than us.
+	 */
 
 	return 0;
 }
@@ -404,7 +460,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
 
 		pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
 		mutex_lock(&cma_mutex);
-		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
+		ret = alloc_contig_range(pfn, pfn + count);
 		mutex_unlock(&cma_mutex);
 		if (ret == 0) {
 			page = pfn_to_page(pfn);

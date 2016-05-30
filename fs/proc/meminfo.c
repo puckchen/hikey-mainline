@@ -167,7 +167,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 #endif
 #ifdef CONFIG_CMA
 		, K(totalcma_pages)
-		, K(global_page_state(NR_FREE_CMA_PAGES))
+		, K(cma_get_free())
 #endif
 		);
 

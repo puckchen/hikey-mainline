@@ -685,8 +685,15 @@ int fragmentation_index(struct zone *zone, unsigned int order)
 #define TEXT_FOR_HIGHMEM(xx)
 #endif
 
+#ifdef CONFIG_CMA
+#define TEXT_FOR_CMA(xx) xx "_cma",
+#else
+#define TEXT_FOR_CMA(xx)
+#endif
+
 #define TEXTS_FOR_ZONES(xx) TEXT_FOR_DMA(xx) TEXT_FOR_DMA32(xx) xx "_normal", \
-					TEXT_FOR_HIGHMEM(xx) xx "_movable",
+					TEXT_FOR_HIGHMEM(xx) xx "_movable", \
+					TEXT_FOR_CMA(xx)
 
 const char * const vmstat_text[] = {
 	/* enum zone_stat_item countes */
@@ -731,7 +738,6 @@ const char * const vmstat_text[] = {
 	"workingset_activate",
 	"workingset_nodereclaim",
 	"nr_anon_transparent_hugepages",
-	"nr_free_cma",
 
 	/* enum writeback_stat_item counters */
 	"nr_dirty_threshold",
@@ -1067,10 +1073,7 @@ static void pagetypeinfo_showmixedcount_print(struct seq_file *m,
 
 			page_mt = gfpflags_to_migratetype(page_ext->gfp_mask);
 			if (pageblock_mt != page_mt) {
-				if (is_migrate_cma(pageblock_mt))
-					count[MIGRATE_MOVABLE]++;
-				else
-					count[pageblock_mt]++;
+				count[pageblock_mt]++;
 
 				pfn = block_end_pfn;
 				break;
