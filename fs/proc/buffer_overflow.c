@@ -8,13 +8,8 @@
 
 #define MAX_LENGTH 64
 
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Ryan Welton");
-MODULE_DESCRIPTION("Stack Buffer Overflow Example");
-
 static struct proc_dir_entry *stack_buffer_proc_entry;
 
-/*ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *)*/
 ssize_t proc_entry_write(struct file *file, const char __user *ubuf, size_t count, loff_t *data)
 {
 	char buf[MAX_LENGTH];
@@ -22,17 +17,34 @@ ssize_t proc_entry_write(struct file *file, const char __user *ubuf, size_t coun
 	pr_err("ubuf %lx count %d\n", ubuf, count);
 
 	if (copy_from_user(&buf, ubuf, count)) {
-		printk(KERN_INFO "stackBufferProcEntry: error copying data from userspace\n");
+		pr_err("error copying from user data\n");
 		return -EFAULT;
 	}
+	dump_stack();
 
 	return count;
 }
 
+ssize_t proc_entry_read(struct file *fid, char __user *buf, size_t size, loff_t * ppos)
+{
+        return 0;
+}
+
+static int proc_entry_show(struct seq_file *m, void *v)
+{
+	return 0;
+}
+
+static int proc_entry_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_entry_show, NULL);
+}
+
+
 static const struct file_operations buffer_operations = {
-	.write  = proc_entry_write,
-	.open           = single_open,
-	.read           = seq_read,
+	.open           = proc_entry_open,
+	.read 		= proc_entry_read,
+	.write  	= proc_entry_write,
 	.llseek         = seq_lseek,
 	.release        = single_release,
 };
@@ -40,10 +52,9 @@ static const struct file_operations buffer_operations = {
 static int __init stack_buffer_proc_init(void)
 {
 
-	stack_buffer_proc_entry = proc_create("stack_buffer_overflow", 0666, NULL, &buffer_operations);
+	proc_create("stack_buffer_overflow", 0666, NULL, &buffer_operations);
 
-	printk(KERN_INFO "created /proc/stack_buffer_overflow\n");
-
+	pr_err("created /proc/stack_buffer_overflow\n");
 	return 0;
 }
 
