@@ -104,6 +104,23 @@ void __exit test_ioctl_cleanup(void)
 	misc_deregister(&test_ioctl_dev);
 }
 
+/*static ssize_t read_test_ioctl(struct file *file, char __user *buf,*/
+			       /*size_t count, loff_t *ppos)*/
+
+void non_vo_test(void)
+{
+	int *test = 3;
+	int data;
+	data = *test;
+}
+
+void vo_test(void)
+{
+	volatile int *test = 3;
+	int data;
+	data = *test;
+}
+
 module_init(test_ioctl_init);
 module_exit(test_ioctl_cleanup);
 MODULE_LICENSE("GPL");

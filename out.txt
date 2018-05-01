@@ -1,0 +1,147 @@
+
+fs/proc/test-ioctl.o:     file format elf64-littleaarch64
+
+
+Disassembly of section .text:
+
+0000000000000000 <test_ioctl_open>:
+   0:	a9bf7bfd 	stp	x29, x30, [sp,#-16]!
+   4:	90000000 	adrp	x0, 0 <test_ioctl_open>
+   8:	90000001 	adrp	x1, 0 <test_ioctl_open>
+   c:	910003fd 	mov	x29, sp
+  10:	91000021 	add	x1, x1, #0x0
+  14:	91000000 	add	x0, x0, #0x0
+  18:	94000000 	bl	0 <printk>
+  1c:	52800000 	mov	w0, #0x0                   	// #0
+  20:	a8c17bfd 	ldp	x29, x30, [sp],#16
+  24:	d65f03c0 	ret
+
+0000000000000028 <write_test_ioctl>:
+  28:	a9bf7bfd 	stp	x29, x30, [sp,#-16]!
+  2c:	90000001 	adrp	x1, 0 <test_ioctl_open>
+  30:	90000000 	adrp	x0, 0 <test_ioctl_open>
+  34:	91000021 	add	x1, x1, #0x0
+  38:	910003fd 	mov	x29, sp
+  3c:	91004021 	add	x1, x1, #0x10
+  40:	52800442 	mov	w2, #0x22                  	// #34
+  44:	91000000 	add	x0, x0, #0x0
+  48:	94000000 	bl	0 <printk>
+  4c:	d2800000 	mov	x0, #0x0                   	// #0
+  50:	a8c17bfd 	ldp	x29, x30, [sp],#16
+  54:	d65f03c0 	ret
+
+0000000000000058 <read_test_ioctl>:
+  58:	a9bf7bfd 	stp	x29, x30, [sp,#-16]!
+  5c:	90000001 	adrp	x1, 0 <test_ioctl_open>
+  60:	90000000 	adrp	x0, 0 <test_ioctl_open>
+  64:	91000021 	add	x1, x1, #0x0
+  68:	910003fd 	mov	x29, sp
+  6c:	9100a021 	add	x1, x1, #0x28
+  70:	52800362 	mov	w2, #0x1b                  	// #27
+  74:	91000000 	add	x0, x0, #0x0
+  78:	94000000 	bl	0 <printk>
+  7c:	d2800000 	mov	x0, #0x0                   	// #0
+  80:	a8c17bfd 	ldp	x29, x30, [sp],#16
+  84:	d65f03c0 	ret
+
+0000000000000088 <test_ioctl_llseek>:
+  88:	a9bf7bfd 	stp	x29, x30, [sp,#-16]!
+  8c:	92f00003 	mov	x3, #0x7fffffffffffffff    	// #9223372036854775807
+  90:	d2800004 	mov	x4, #0x0                   	// #0
+  94:	910003fd 	mov	x29, sp
+  98:	94000000 	bl	0 <generic_file_llseek_size>
+  9c:	a8c17bfd 	ldp	x29, x30, [sp],#16
+  a0:	d65f03c0 	ret
+
+00000000000000a4 <test_ioctl_unlocked_ioctl>:
+  a4:	a9bd7bfd 	stp	x29, x30, [sp,#-48]!
+  a8:	910003fd 	mov	x29, sp
+  ac:	a90153f3 	stp	x19, x20, [sp,#16]
+  b0:	90000013 	adrp	x19, 0 <test_ioctl_open>
+  b4:	91000260 	add	x0, x19, #0x0
+  b8:	f90017a1 	str	x1, [x29,#40]
+  bc:	91014000 	add	x0, x0, #0x50
+  c0:	94000000 	bl	0 <mutex_lock>
+  c4:	f94017a1 	ldr	x1, [x29,#40]
+  c8:	7102003f 	cmp	w1, #0x80
+  cc:	54000460 	b.eq	158 <test_ioctl_unlocked_ioctl+0xb4>
+  d0:	7102043f 	cmp	w1, #0x81
+  d4:	540002c0 	b.eq	12c <test_ioctl_unlocked_ioctl+0x88>
+  d8:	7101fc3f 	cmp	w1, #0x7f
+  dc:	928002b4 	mov	x20, #0xffffffffffffffea    	// #-22
+  e0:	54000100 	b.eq	100 <test_ioctl_unlocked_ioctl+0x5c>
+  e4:	91000260 	add	x0, x19, #0x0
+  e8:	91014000 	add	x0, x0, #0x50
+  ec:	94000000 	bl	0 <mutex_unlock>
+  f0:	aa1403e0 	mov	x0, x20
+  f4:	a94153f3 	ldp	x19, x20, [sp,#16]
+  f8:	a8c37bfd 	ldp	x29, x30, [sp],#48
+  fc:	d65f03c0 	ret
+ 100:	90000000 	adrp	x0, 0 <test_ioctl_open>
+ 104:	d2800014 	mov	x20, #0x0                   	// #0
+ 108:	91000000 	add	x0, x0, #0x0
+ 10c:	94000000 	bl	0 <printk>
+ 110:	91000260 	add	x0, x19, #0x0
+ 114:	91014000 	add	x0, x0, #0x50
+ 118:	94000000 	bl	0 <mutex_unlock>
+ 11c:	aa1403e0 	mov	x0, x20
+ 120:	a94153f3 	ldp	x19, x20, [sp,#16]
+ 124:	a8c37bfd 	ldp	x29, x30, [sp],#48
+ 128:	d65f03c0 	ret
+ 12c:	90000000 	adrp	x0, 0 <test_ioctl_open>
+ 130:	d2800014 	mov	x20, #0x0                   	// #0
+ 134:	91000000 	add	x0, x0, #0x0
+ 138:	94000000 	bl	0 <printk>
+ 13c:	91000260 	add	x0, x19, #0x0
+ 140:	91014000 	add	x0, x0, #0x50
+ 144:	94000000 	bl	0 <mutex_unlock>
+ 148:	aa1403e0 	mov	x0, x20
+ 14c:	a94153f3 	ldp	x19, x20, [sp,#16]
+ 150:	a8c37bfd 	ldp	x29, x30, [sp],#48
+ 154:	d65f03c0 	ret
+ 158:	90000000 	adrp	x0, 0 <test_ioctl_open>
+ 15c:	d2800014 	mov	x20, #0x0                   	// #0
+ 160:	91000000 	add	x0, x0, #0x0
+ 164:	94000000 	bl	0 <printk>
+ 168:	91000260 	add	x0, x19, #0x0
+ 16c:	91014000 	add	x0, x0, #0x50
+ 170:	94000000 	bl	0 <mutex_unlock>
+ 174:	aa1403e0 	mov	x0, x20
+ 178:	a94153f3 	ldp	x19, x20, [sp,#16]
+ 17c:	a8c37bfd 	ldp	x29, x30, [sp],#48
+ 180:	d65f03c0 	ret
+
+0000000000000184 <non_vo_test>:
+ 184:	d65f03c0 	ret
+
+0000000000000188 <vo_test>:
+ 188:	d2800060 	mov	x0, #0x3                   	// #3
+ 18c:	b9400000 	ldr	w0, [x0]
+ 190:	d65f03c0 	ret
+
+Disassembly of section .init.text:
+
+0000000000000000 <test_ioctl_init>:
+   0:	a9bf7bfd 	stp	x29, x30, [sp,#-16]!
+   4:	90000000 	adrp	x0, 0 <test_ioctl_init>
+   8:	90000001 	adrp	x1, 0 <test_ioctl_init>
+   c:	910003fd 	mov	x29, sp
+  10:	91000021 	add	x1, x1, #0x0
+  14:	91000000 	add	x0, x0, #0x0
+  18:	94000000 	bl	0 <printk>
+  1c:	90000000 	adrp	x0, 0 <test_ioctl_init>
+  20:	91000000 	add	x0, x0, #0x0
+  24:	94000000 	bl	0 <misc_register>
+  28:	a8c17bfd 	ldp	x29, x30, [sp],#16
+  2c:	d65f03c0 	ret
+
+Disassembly of section .exit.text:
+
+0000000000000000 <test_ioctl_cleanup>:
+   0:	a9bf7bfd 	stp	x29, x30, [sp,#-16]!
+   4:	90000000 	adrp	x0, 0 <test_ioctl_cleanup>
+   8:	910003fd 	mov	x29, sp
+   c:	91000000 	add	x0, x0, #0x0
+  10:	94000000 	bl	0 <misc_deregister>
+  14:	a8c17bfd 	ldp	x29, x30, [sp],#16
+  18:	d65f03c0 	ret
